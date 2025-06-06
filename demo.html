@@ -89,6 +89,68 @@
                 </div>
             </div>
 
+            <!-- Price Projection Timeline -->
+            <div v-if="lastCalculation" class="mb-8">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-semibold">Прогноз стоимости на будущее</h2>
+                        <div class="flex space-x-2">
+                            <button v-for="scenario in projectionScenarios" :key="scenario.key"
+                                    @click="selectedScenario = scenario.key"
+                                    :class="[
+                                        'px-3 py-1 rounded-full text-sm font-medium transition-all duration-200',
+                                        selectedScenario === scenario.key 
+                                            ? 'bg-blue-500 text-white' 
+                                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    ]">
+                                {{ scenario.name }}
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Timeline Chart -->
+                    <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                        <h3 class="text-lg font-medium mb-4">Динамика стоимости ({{ getCurrentScenario().name }})</h3>
+                        <canvas id="projectionChart" width="800" height="300"></canvas>
+                    </div>
+                    
+                    <!-- Projection Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div v-for="(projection, index) in getProjections()" :key="index"
+                             class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 text-center transform transition-all duration-500 hover:scale-105"
+                             :style="{ animationDelay: (index * 200) + 'ms' }">
+                            <div class="text-xs text-blue-600 mb-1">{{ projection.year }}</div>
+                            <div class="text-lg font-bold text-blue-800 mb-1">
+                                {{ formatPrice(projection.value) }} ₽
+                            </div>
+                            <div class="text-xs text-blue-600">
+                                {{ projection.change > 0 ? '+' : '' }}{{ projection.change.toFixed(1) }}%
+                            </div>
+                            <div class="mt-2 bg-blue-200 rounded-full h-1">
+                                <div class="bg-blue-500 h-1 rounded-full transition-all duration-1000"
+                                     :style="{ width: Math.min(projection.change + 100, 100) + '%' }"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Projection Details -->
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div class="flex items-start space-x-3">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-yellow-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                            <div class="text-sm text-yellow-800">
+                                <p class="font-medium mb-1">Прогноз основан на исторических данных</p>
+                                <p>{{ getCurrentScenario().description }}</p>
+                                <p class="mt-2">Факторы влияния: инфляция ({{ getCurrentScenario().inflation }}%), рост рынка недвижимости, демографические изменения</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="flex flex-col lg:flex-row gap-8">
                 <!-- Форма -->
                 <div class="lg:w-2/3">
@@ -323,7 +385,7 @@
     </div>
 
     <script>
-        const { createApp, ref, computed, onMounted } = Vue;
+        const { createApp, ref, computed, onMounted, watch } = Vue;
 
         createApp({
             setup() {
@@ -355,6 +417,8 @@
                 const showExportMenu = ref(false);
                 const priceChart = ref(null);
                 const marketChart = ref(null);
+                const projectionChart = ref(null);
+                const selectedScenario = ref('optimistic');
 
                 const buildingTypes = {
                     1: 'Панельный',
@@ -382,6 +446,34 @@
                     }
                 };
 
+                // Projection scenarios
+                const projectionScenarios = [
+                    {
+                        key: 'conservative',
+                        name: 'Консервативный',
+                        description: 'Умеренный рост рынка недвижимости с учетом экономической стабильности',
+                        inflation: 4,
+                        annualGrowth: 3.5,
+                        volatility: 0.5
+                    },
+                    {
+                        key: 'optimistic',
+                        name: 'Оптимистичный',
+                        description: 'Активный рост рынка при благоприятных экономических условиях',
+                        inflation: 5,
+                        annualGrowth: 6.2,
+                        volatility: 1.2
+                    },
+                    {
+                        key: 'pessimistic',
+                        name: 'Пессимистичный',
+                        description: 'Стагнация или минимальный рост при неблагоприятных условиях',
+                        inflation: 3,
+                        annualGrowth: 1.8,
+                        volatility: 0.8
+                    }
+                ];
+
                 // Computed properties for analytics
                 const averagePrice = computed(() => {
                     if (calculations.value.length === 0) return 0;
@@ -405,6 +497,42 @@
                     if (diff < -10) return Math.round(diff) + '%';
                     return 'В тренде';
                 });
+
+                // Projection functions
+                const getCurrentScenario = () => {
+                    return projectionScenarios.find(s => s.key === selectedScenario.value);
+                };
+
+                const getProjections = () => {
+                    if (!lastCalculation.value) return [];
+                    
+                    const currentPrice = lastCalculation.value.price;
+                    const scenario = getCurrentScenario();
+                    const currentYear = new Date().getFullYear();
+                    const projections = [];
+                    
+                    // Calculate for next 4 years
+                    for (let i = 1; i <= 4; i++) {
+                        const baseGrowth = scenario.annualGrowth / 100;
+                        const volatility = scenario.volatility / 100;
+                        
+                        // Add some market volatility simulation
+                        const randomFactor = 1 + (Math.random() - 0.5) * volatility;
+                        const growthRate = baseGrowth * randomFactor;
+                        
+                        // Compound growth
+                        const projectedValue = currentPrice * Math.pow(1 + growthRate, i);
+                        const changePercent = ((projectedValue - currentPrice) / currentPrice) * 100;
+                        
+                        projections.push({
+                            year: currentYear + i,
+                            value: Math.round(projectedValue),
+                            change: changePercent
+                        });
+                    }
+                    
+                    return projections;
+                };
 
                 // Market insights generation
                 const getMarketInsights = () => {
@@ -550,6 +678,89 @@
                     });
                 };
 
+                const createProjectionChart = () => {
+                    const ctx = document.getElementById('projectionChart');
+                    if (!ctx || !lastCalculation.value) return;
+                    
+                    const currentPrice = lastCalculation.value.price;
+                    const projections = getProjections();
+                    const currentYear = new Date().getFullYear();
+                    
+                    // Prepare data for the chart
+                    const labels = [currentYear, ...projections.map(p => p.year)];
+                    const values = [currentPrice, ...projections.map(p => p.value)];
+                    
+                    if (projectionChart.value) {
+                        projectionChart.value.destroy();
+                    }
+                    
+                    projectionChart.value = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Прогнозная стоимость',
+                                data: values,
+                                borderColor: 'rgb(99, 102, 241)',
+                                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                                tension: 0.4,
+                                fill: true,
+                                pointBackgroundColor: 'rgb(99, 102, 241)',
+                                pointBorderColor: '#fff',
+                                pointBorderWidth: 2,
+                                pointRadius: 6,
+                                pointHoverRadius: 8
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            interaction: {
+                                intersect: false,
+                                mode: 'index'
+                            },
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                    titleColor: '#fff',
+                                    bodyColor: '#fff',
+                                    callbacks: {
+                                        label: function(context) {
+                                            const value = context.parsed.y;
+                                            const formatted = new Intl.NumberFormat('ru-RU').format(value);
+                                            return `Стоимость: ${formatted} ₽`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    grid: {
+                                        color: 'rgba(0, 0, 0, 0.1)'
+                                    }
+                                },
+                                y: {
+                                    beginAtZero: false,
+                                    grid: {
+                                        color: 'rgba(0, 0, 0, 0.1)'
+                                    },
+                                    ticks: {
+                                        callback: function(value) {
+                                            return (value / 1000000).toFixed(1) + 'М ₽';
+                                        }
+                                    }
+                                }
+                            },
+                            animation: {
+                                duration: 2000,
+                                easing: 'easeInOutCubic'
+                            }
+                        }
+                    });
+                };
+
                 const updateCharts = () => {
                     if (calculations.value.length >= 3) {
                         setTimeout(() => {
@@ -557,7 +768,18 @@
                             createMarketChart();
                         }, 100);
                     }
+                    
+                    if (lastCalculation.value) {
+                        setTimeout(() => {
+                            createProjectionChart();
+                        }, 200);
+                    }
                 };
+
+                // Watch for scenario changes to update projection chart
+                watch(selectedScenario, () => {
+                    updateCharts();
+                });
 
                 // Загрузка из localStorage
                 onMounted(() => {
@@ -831,6 +1053,8 @@
                     loading,
                     lastCalculation,
                     showExportMenu,
+                    selectedScenario,
+                    projectionScenarios,
                     buildingTypes,
                     renovationTypes,
                     averagePrice,
@@ -843,6 +1067,8 @@
                     getBuildingTypeText,
                     getRenovationText,
                     getMarketInsights,
+                    getCurrentScenario,
+                    getProjections,
                     exportToPDF,
                     exportToExcel,
                     exportSingleCalculation
