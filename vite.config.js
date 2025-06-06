@@ -6,6 +6,14 @@ export default defineConfig({
   server: {
     port: 5000,
     host: '0.0.0.0',
-    allowedHosts: ['all']
+    allowedHosts: ['all'],
+    hmr: {
+      port: 5000,
+      host: '0.0.0.0'
+    },
+    origin: `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+  },
+  define: {
+    global: 'globalThis'
   }
 })
