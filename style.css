@@ -1,6 +1,4 @@
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+/* Using Tailwind via CDN in index.html */
 
 :root {
   --primary: 59 130 246; /* #3B82F6 */
