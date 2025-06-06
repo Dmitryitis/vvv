@@ -23,7 +23,7 @@ interface Option {
   value: number
 }
 
-defineProps<{
+const props = defineProps<{
   options: Option[]
   modelValue?: number | null
 }>()
@@ -39,9 +39,4 @@ const isSelected = (value: number): boolean => {
 const selectOption = (value: number) => {
   emit('update:modelValue', value)
 }
-
-const props = defineProps<{
-  options: Option[]
-  modelValue?: number | null
-}>()
 </script>
