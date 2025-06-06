@@ -300,6 +300,7 @@
                 const calculations = ref([]);
                 const loading = ref(false);
                 const lastCalculation = ref(null);
+                const showExportMenu = ref(false);
 
                 const buildingTypes = {
                     1: 'Панельный',
@@ -450,11 +451,142 @@
                     return renovationTypes[value] || 'Не указан';
                 };
 
+                // Export to PDF function
+                const exportToPDF = () => {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    
+                    // Set font for Cyrillic support
+                    doc.setFont("helvetica");
+                    
+                    // Header
+                    doc.setFontSize(20);
+                    doc.text('Отчет по оценке недвижимости', 20, 30);
+                    
+                    doc.setFontSize(12);
+                    doc.text(`Дата создания: ${new Date().toLocaleDateString('ru-RU')}`, 20, 45);
+                    doc.text(`Всего расчетов: ${calculations.value.length}`, 20, 55);
+                    
+                    let yPosition = 75;
+                    
+                    calculations.value.forEach((calc, index) => {
+                        if (yPosition > 250) {
+                            doc.addPage();
+                            yPosition = 30;
+                        }
+                        
+                        doc.setFontSize(14);
+                        doc.text(`Расчет ${index + 1}`, 20, yPosition);
+                        
+                        doc.setFontSize(10);
+                        yPosition += 15;
+                        doc.text(`Стоимость: ${formatPrice(calc.price)} руб.`, 20, yPosition);
+                        yPosition += 10;
+                        doc.text(`Площадь: ${calc.apartmentData.totalArea} кв.м`, 20, yPosition);
+                        yPosition += 10;
+                        doc.text(`Этаж: ${calc.apartmentData.floor}`, 20, yPosition);
+                        yPosition += 10;
+                        doc.text(`Тип дома: ${getBuildingTypeText(calc.apartmentData.buildingType)}`, 20, yPosition);
+                        yPosition += 10;
+                        doc.text(`Ремонт: ${getRenovationText(calc.apartmentData.renovation)}`, 20, yPosition);
+                        yPosition += 10;
+                        doc.text(`Дата: ${new Date(calc.timestamp).toLocaleDateString('ru-RU')}`, 20, yPosition);
+                        yPosition += 20;
+                    });
+                    
+                    doc.save('apartment-calculations.pdf');
+                    showExportMenu.value = false;
+                };
+
+                // Export to Excel function
+                const exportToExcel = () => {
+                    const wb = XLSX.utils.book_new();
+                    
+                    const wsData = [
+                        ['Дата', 'Стоимость (руб)', 'Площадь (кв.м)', 'Этаж', 'Тип дома', 'Ремонт', 'Цена за кв.м']
+                    ];
+                    
+                    calculations.value.forEach(calc => {
+                        wsData.push([
+                            new Date(calc.timestamp).toLocaleDateString('ru-RU'),
+                            calc.price,
+                            calc.apartmentData.totalArea,
+                            calc.apartmentData.floor,
+                            getBuildingTypeText(calc.apartmentData.buildingType),
+                            getRenovationText(calc.apartmentData.renovation),
+                            Math.round(calc.price / calc.apartmentData.totalArea)
+                        ]);
+                    });
+                    
+                    const ws = XLSX.utils.aoa_to_sheet(wsData);
+                    XLSX.utils.book_append_sheet(wb, ws, "Расчеты");
+                    
+                    XLSX.writeFile(wb, 'apartment-calculations.xlsx');
+                    showExportMenu.value = false;
+                };
+
+                // Export single calculation
+                const exportSingleCalculation = (calc) => {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    
+                    doc.setFont("helvetica");
+                    doc.setFontSize(20);
+                    doc.text('Оценка стоимости квартиры', 20, 30);
+                    
+                    doc.setFontSize(12);
+                    doc.text(`Дата оценки: ${new Date(calc.timestamp).toLocaleDateString('ru-RU')}`, 20, 50);
+                    
+                    // Main price
+                    doc.setFontSize(16);
+                    doc.text(`Рыночная стоимость: ${formatPrice(calc.price)} руб.`, 20, 75);
+                    
+                    // Price range
+                    doc.setFontSize(12);
+                    doc.text(`Диапазон цен: ${formatPrice(calc.priceRange.min)} - ${formatPrice(calc.priceRange.max)} руб.`, 20, 90);
+                    
+                    // Apartment details
+                    doc.setFontSize(14);
+                    doc.text('Характеристики квартиры:', 20, 110);
+                    
+                    doc.setFontSize(10);
+                    let y = 125;
+                    doc.text(`Общая площадь: ${calc.apartmentData.totalArea} кв.м`, 20, y);
+                    y += 12;
+                    doc.text(`Жилая площадь: ${calc.apartmentData.livingArea} кв.м`, 20, y);
+                    y += 12;
+                    doc.text(`Этаж: ${calc.apartmentData.floor}`, 20, y);
+                    y += 12;
+                    doc.text(`Тип дома: ${getBuildingTypeText(calc.apartmentData.buildingType)}`, 20, y);
+                    y += 12;
+                    doc.text(`Уровень ремонта: ${getRenovationText(calc.apartmentData.renovation)}`, 20, y);
+                    y += 12;
+                    doc.text(`Цена за кв.м: ${Math.round(calc.price / calc.apartmentData.totalArea)} руб.`, 20, y);
+                    
+                    if (calc.apartmentData.kitchenArea) {
+                        y += 12;
+                        doc.text(`Площадь кухни: ${calc.apartmentData.kitchenArea} кв.м`, 20, y);
+                    }
+                    
+                    if (calc.apartmentData.balcony) {
+                        y += 12;
+                        doc.text('Балкон: Есть', 20, y);
+                    }
+                    
+                    if (calc.apartmentData.parking) {
+                        y += 12;
+                        doc.text('Парковка: Есть', 20, y);
+                    }
+                    
+                    doc.save(`apartment-calculation-${calc.id}.pdf`);
+                };
+
                 return {
                     form,
                     calculations,
                     loading,
                     lastCalculation,
+                    showExportMenu,
                     buildingTypes,
                     renovationTypes,
                     calculatePrice,
@@ -462,7 +594,10 @@
                     formatPrice,
                     formatDate,
                     getBuildingTypeText,
-                    getRenovationText
+                    getRenovationText,
+                    exportToPDF,
+                    exportToExcel,
+                    exportSingleCalculation
                 };
             }
         }).mount('#app');
