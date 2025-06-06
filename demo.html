@@ -8,6 +8,7 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div id="app" class="min-h-screen bg-gray-50">
@@ -33,6 +34,57 @@
                         <img src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80" 
                              alt="Современная квартира" 
                              class="w-full h-64 lg:h-80 object-cover">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Section -->
+            <div v-if="calculations.length >= 3" class="mb-8">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-semibold mb-6">Аналитика и сравнение с рынком</h2>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Price Trend Chart -->
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h3 class="text-lg font-medium mb-4">Динамика ваших расчетов</h3>
+                            <canvas id="priceChart" width="400" height="200"></canvas>
+                        </div>
+                        
+                        <!-- Market Comparison -->
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h3 class="text-lg font-medium mb-4">Сравнение с рынком</h3>
+                            <canvas id="marketChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Statistics Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-blue-700">{{ formatPrice(averagePrice) }}</div>
+                            <div class="text-sm text-blue-600">Средняя цена</div>
+                        </div>
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-green-700">{{ averagePricePerSqm }}</div>
+                            <div class="text-sm text-green-600">₽/м² в среднем</div>
+                        </div>
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-purple-700">{{ marketTrendText }}</div>
+                            <div class="text-sm text-purple-600">Тренд рынка</div>
+                        </div>
+                        <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-orange-700">{{ calculations.length }}</div>
+                            <div class="text-sm text-orange-600">Всего оценок</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Market Insights -->
+                    <div class="mt-6 bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                        <h4 class="font-medium text-indigo-900 mb-2">Рыночные инсайты</h4>
+                        <div class="text-sm text-indigo-700 space-y-1">
+                            <p>• {{ getMarketInsights().pricePosition }}</p>
+                            <p>• {{ getMarketInsights().buildingTypeInsight }}</p>
+                            <p>• {{ getMarketInsights().renovationInsight }}</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -271,7 +323,7 @@
     </div>
 
     <script>
-        const { createApp, ref, onMounted } = Vue;
+        const { createApp, ref, computed, onMounted } = Vue;
 
         createApp({
             setup() {
@@ -301,6 +353,8 @@
                 const loading = ref(false);
                 const lastCalculation = ref(null);
                 const showExportMenu = ref(false);
+                const priceChart = ref(null);
+                const marketChart = ref(null);
 
                 const buildingTypes = {
                     1: 'Панельный',
@@ -317,12 +371,201 @@
                     4: 'Дизайнерский'
                 };
 
+                // Market reference data for comparison
+                const marketData = {
+                    averagePricePerSqm: 220000, // Average Moscow price per sqm
+                    buildingTypeMultipliers: {
+                        1: 0.85, 2: 1.1, 3: 1.15, 4: 1.2, 5: 1.3
+                    },
+                    renovationMultipliers: {
+                        1: 0.8, 2: 0.9, 3: 1.1, 4: 1.3
+                    }
+                };
+
+                // Computed properties for analytics
+                const averagePrice = computed(() => {
+                    if (calculations.value.length === 0) return 0;
+                    const sum = calculations.value.reduce((acc, calc) => acc + calc.price, 0);
+                    return Math.round(sum / calculations.value.length);
+                });
+
+                const averagePricePerSqm = computed(() => {
+                    if (calculations.value.length === 0) return 0;
+                    const totalPrice = calculations.value.reduce((acc, calc) => acc + calc.price, 0);
+                    const totalArea = calculations.value.reduce((acc, calc) => acc + calc.apartmentData.totalArea, 0);
+                    return Math.round(totalPrice / totalArea);
+                });
+
+                const marketTrendText = computed(() => {
+                    const userAvg = averagePricePerSqm.value;
+                    const marketAvg = marketData.averagePricePerSqm;
+                    const diff = ((userAvg - marketAvg) / marketAvg * 100);
+                    
+                    if (diff > 10) return '+' + Math.round(diff) + '%';
+                    if (diff < -10) return Math.round(diff) + '%';
+                    return 'В тренде';
+                });
+
+                // Market insights generation
+                const getMarketInsights = () => {
+                    if (calculations.value.length < 3) return {};
+                    
+                    const userAvg = averagePricePerSqm.value;
+                    const marketAvg = marketData.averagePricePerSqm;
+                    
+                    // Price position analysis
+                    let pricePosition = '';
+                    const priceDiff = ((userAvg - marketAvg) / marketAvg * 100);
+                    if (priceDiff > 15) {
+                        pricePosition = 'Ваши объекты оцениваются выше рыночной стоимости';
+                    } else if (priceDiff < -15) {
+                        pricePosition = 'Ваши объекты оцениваются ниже рыночной стоимости';
+                    } else {
+                        pricePosition = 'Ваши оценки соответствуют рыночным показателям';
+                    }
+                    
+                    // Building type analysis
+                    const buildingTypeCounts = calculations.value.reduce((acc, calc) => {
+                        const type = calc.apartmentData.buildingType;
+                        acc[type] = (acc[type] || 0) + 1;
+                        return acc;
+                    }, {});
+                    const mostCommonType = Object.keys(buildingTypeCounts).reduce((a, b) => 
+                        buildingTypeCounts[a] > buildingTypeCounts[b] ? a : b
+                    );
+                    const buildingTypeInsight = `Чаще всего оцениваете: ${buildingTypes[mostCommonType]}`;
+                    
+                    // Renovation analysis
+                    const renovationCounts = calculations.value.reduce((acc, calc) => {
+                        const renovation = calc.apartmentData.renovation;
+                        acc[renovation] = (acc[renovation] || 0) + 1;
+                        return acc;
+                    }, {});
+                    const mostCommonRenovation = Object.keys(renovationCounts).reduce((a, b) => 
+                        renovationCounts[a] > renovationCounts[b] ? a : b
+                    );
+                    const renovationInsight = `Преобладающий ремонт: ${renovationTypes[mostCommonRenovation]}`;
+                    
+                    return {
+                        pricePosition,
+                        buildingTypeInsight,
+                        renovationInsight
+                    };
+                };
+
+                // Chart creation functions
+                const createPriceChart = () => {
+                    const ctx = document.getElementById('priceChart');
+                    if (!ctx || calculations.value.length < 3) return;
+                    
+                    const sortedCalcs = [...calculations.value].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                    const labels = sortedCalcs.map((calc, index) => `Расчет ${index + 1}`);
+                    const prices = sortedCalcs.map(calc => calc.price);
+                    
+                    if (priceChart.value) {
+                        priceChart.value.destroy();
+                    }
+                    
+                    priceChart.value = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Стоимость квартир',
+                                data: prices,
+                                borderColor: 'rgb(59, 130, 246)',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                tension: 0.1,
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: false,
+                                    ticks: {
+                                        callback: function(value) {
+                                            return (value / 1000000).toFixed(1) + 'М';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                };
+
+                const createMarketChart = () => {
+                    const ctx = document.getElementById('marketChart');
+                    if (!ctx || calculations.value.length < 3) return;
+                    
+                    const userAvg = averagePricePerSqm.value;
+                    const marketAvg = marketData.averagePricePerSqm;
+                    
+                    if (marketChart.value) {
+                        marketChart.value.destroy();
+                    }
+                    
+                    marketChart.value = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['Ваша средняя', 'Рынок Москвы'],
+                            datasets: [{
+                                label: 'Цена за м²',
+                                data: [userAvg, marketAvg],
+                                backgroundColor: [
+                                    'rgba(34, 197, 94, 0.8)',
+                                    'rgba(156, 163, 175, 0.8)'
+                                ],
+                                borderColor: [
+                                    'rgb(34, 197, 94)',
+                                    'rgb(156, 163, 175)'
+                                ],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: false,
+                                    ticks: {
+                                        callback: function(value) {
+                                            return (value / 1000).toFixed(0) + 'К';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                };
+
+                const updateCharts = () => {
+                    if (calculations.value.length >= 3) {
+                        setTimeout(() => {
+                            createPriceChart();
+                            createMarketChart();
+                        }, 100);
+                    }
+                };
+
                 // Загрузка из localStorage
                 onMounted(() => {
                     const stored = localStorage.getItem('apartment-calculations');
                     if (stored) {
                         try {
                             calculations.value = JSON.parse(stored);
+                            updateCharts();
                         } catch (error) {
                             console.error('Ошибка загрузки из localStorage:', error);
                         }
@@ -419,6 +662,7 @@
                         calculations.value.unshift(calculation);
                         lastCalculation.value = calculation;
                         saveCalculations();
+                        updateCharts();
                     } catch (error) {
                         console.error('Ошибка расчета:', error);
                         alert('Произошла ошибка при расчете');
@@ -589,12 +833,16 @@
                     showExportMenu,
                     buildingTypes,
                     renovationTypes,
+                    averagePrice,
+                    averagePricePerSqm,
+                    marketTrendText,
                     calculatePrice,
                     deleteCalculation,
                     formatPrice,
                     formatDate,
                     getBuildingTypeText,
                     getRenovationText,
+                    getMarketInsights,
                     exportToPDF,
                     exportToExcel,
                     exportSingleCalculation

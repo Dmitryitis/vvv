@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест экспорта</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <h1>Тест функции экспорта</h1>
+    <button onclick="testPDF()">Тест PDF</button>
+    <button onclick="testExcel()">Тест Excel</button>
+    
+    <script>
+        function testPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text('Test PDF Export', 20, 20);
+            doc.save('test.pdf');
+            console.log('PDF export working');
+        }
+        
+        function testExcel() {
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet([['Test', 'Data'], ['Row1', 'Value1']]);
+            XLSX.utils.book_append_sheet(wb, ws, "Test");
+            XLSX.writeFile(wb, 'test.xlsx');
+            console.log('Excel export working');
+        }
+    </script>
+</body>
+</html>
