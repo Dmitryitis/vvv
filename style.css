@@ -1,4 +1,6 @@
-/* Using Tailwind via CDN in index.html */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   --primary: 59 130 246; /* #3B82F6 */
