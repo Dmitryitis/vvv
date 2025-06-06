@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Калькулятор стоимости квартиры - SPA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Navigation -->
+        <nav class="bg-white shadow-lg">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-between items-center py-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="text-2xl font-bold text-blue-600">🏠</div>
+                        <span class="text-xl font-semibold text-gray-900">Калькулятор квартир</span>
+                    </div>
+                    
+                    <div class="hidden md:flex space-x-6">
+                        <router-link to="/" class="nav-link" active-class="nav-link-active">
+                            Калькулятор
+                        </router-link>
+                        <router-link to="/history" class="nav-link" active-class="nav-link-active">
+                            История
+                        </router-link>
+                        <router-link to="/analytics" class="nav-link" active-class="nav-link-active">
+                            Аналитика
+                        </router-link>
+                        <router-link to="/about" class="nav-link" active-class="nav-link-active">
+                            О проекте
+                        </router-link>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="container mx-auto px-4 py-8">
+            <router-view></router-view>
+        </main>
+    </div>
+
+    <style>
+        .nav-link {
+            @apply px-3 py-2 text-gray-600 hover:text-blue-600 transition-colors duration-200 font-medium;
+        }
+        .nav-link-active {
+            @apply text-blue-600 border-b-2 border-blue-600;
+        }
+        .container {
+            max-width: 1200px;
+        }
+    </style>
+
+    <script>
+        const { createApp, ref, computed, onMounted, nextTick } = Vue;
+        const { createRouter, createWebHashHistory } = VueRouter;
+
+        // Calculator component
+        const Calculator = {
+            template: `
+                <div class="space-y-8">
+                    <!-- Hero Section -->
+                    <div class="relative bg-gradient-to-r from-amber-100 to-orange-100 rounded-2xl overflow-hidden">
+                        <div class="flex flex-col lg:flex-row items-center">
+                            <div class="lg:w-1/2 p-8">
+                                <h1 class="text-4xl font-bold text-gray-900 mb-4">Узнайте рыночную стоимость квартиры</h1>
+                                <p class="text-gray-700 text-lg mb-6">Профессиональная оценка недвижимости на основе актуальных рыночных данных</p>
+                                <div class="flex items-center space-x-4 text-sm text-gray-600">
+                                    <div class="flex items-center">
+                                        <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                        Точная оценка
+                                    </div>
+                                    <div class="flex items-center">
+                                        <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                        Быстрый расчет
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="lg:w-1/2">
+                                <img src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80" 
+                                     alt="Современная квартира" 
+                                     class="w-full h-64 lg:h-80 object-cover">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Calculation Result -->
+                    <div v-if="lastResult" class="bg-white rounded-lg shadow-lg p-6">
+                        <h2 class="text-2xl font-semibold mb-4">Результат оценки</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="text-center p-4 bg-blue-50 rounded-lg">
+                                <p class="text-sm text-gray-600 mb-1">Рыночная стоимость</p>
+                                <p class="text-2xl font-bold text-blue-600">{{ formatPrice(lastResult.price) }}</p>
+                            </div>
+                            <div class="text-center p-4 bg-green-50 rounded-lg">
+                                <p class="text-sm text-gray-600 mb-1">Минимальная цена</p>
+                                <p class="text-xl font-semibold text-green-600">{{ formatPrice(lastResult.priceRange?.min) }}</p>
+                            </div>
+                            <div class="text-center p-4 bg-orange-50 rounded-lg">
+                                <p class="text-sm text-gray-600 mb-1">Максимальная цена</p>
+                                <p class="text-xl font-semibold text-orange-600">{{ formatPrice(lastResult.priceRange?.max) }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Apartment Form -->
+                    <apartment-form @calculation-complete="handleCalculation"></apartment-form>
+                </div>
+            `,
+            setup() {
+                const lastResult = ref(null);
+
+                const handleCalculation = (result) => {
+                    lastResult.value = result;
+                };
+
+                const formatPrice = (price) => {
+                    if (!price) return '';
+                    return new Intl.NumberFormat('ru-RU', {
+                        style: 'currency',
+                        currency: 'RUB',
+                        minimumFractionDigits: 0
+                    }).format(price);
+                };
+
+                return { lastResult, handleCalculation, formatPrice };
+            }
+        };
+
+        // History component
+        const History = {
+            template: `
+                <div class="space-y-6">
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h1 class="text-3xl font-bold text-gray-900 mb-6">История расчетов</h1>
+                        <calculation-history></calculation-history>
+                    </div>
+                </div>
+            `
+        };
+
+        // Analytics component
+        const Analytics = {
+            template: `
+                <div class="space-y-6">
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h1 class="text-3xl font-bold text-gray-900 mb-6">Аналитика рынка</h1>
+                        
+                        <!-- Market Overview Stats -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                            <div class="bg-blue-50 rounded-lg p-4 text-center">
+                                <div class="text-2xl font-bold text-blue-600">{{ averagePrice }}</div>
+                                <div class="text-sm text-gray-600">Средняя цена за м²</div>
+                            </div>
+                            <div class="bg-green-50 rounded-lg p-4 text-center">
+                                <div class="text-2xl font-bold text-green-600">{{ totalCalculations }}</div>
+                                <div class="text-sm text-gray-600">Всего расчетов</div>
+                            </div>
+                            <div class="bg-purple-50 rounded-lg p-4 text-center">
+                                <div class="text-2xl font-bold text-purple-600">{{ averageArea }}</div>
+                                <div class="text-sm text-gray-600">Средняя площадь</div>
+                            </div>
+                            <div class="bg-orange-50 rounded-lg p-4 text-center">
+                                <div class="text-2xl font-bold text-orange-600">{{ priceRange }}</div>
+                                <div class="text-sm text-gray-600">Разброс цен</div>
+                            </div>
+                        </div>
+
+                        <!-- Charts Section -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" v-if="calculations.length >= 3">
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <h3 class="text-lg font-medium mb-4">Динамика цен</h3>
+                                <canvas id="priceChart" width="400" height="200"></canvas>
+                            </div>
+                            
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <h3 class="text-lg font-medium mb-4">Распределение по типам домов</h3>
+                                <canvas id="buildingTypeChart" width="400" height="200"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- No data message -->
+                        <div v-else class="text-center py-12 text-gray-500">
+                            <p class="text-lg">Недостаточно данных для аналитики</p>
+                            <p class="text-sm">Выполните несколько расчетов для просмотра статистики</p>
+                        </div>
+                    </div>
+                </div>
+            `,
+            setup() {
+                const calculations = computed(() => {
+                    const stored = localStorage.getItem('apartmentCalculations');
+                    return stored ? JSON.parse(stored) : [];
+                });
+
+                const totalCalculations = computed(() => calculations.value.length);
+
+                const averagePrice = computed(() => {
+                    if (calculations.value.length === 0) return '0 ₽';
+                    const total = calculations.value.reduce((sum, calc) => {
+                        return sum + (calc.price / calc.apartmentData.totalArea);
+                    }, 0);
+                    const avg = total / calculations.value.length;
+                    return new Intl.NumberFormat('ru-RU', {
+                        style: 'currency',
+                        currency: 'RUB',
+                        minimumFractionDigits: 0
+                    }).format(avg);
+                });
+
+                const averageArea = computed(() => {
+                    if (calculations.value.length === 0) return '0 м²';
+                    const total = calculations.value.reduce((sum, calc) => {
+                        return sum + calc.apartmentData.totalArea;
+                    }, 0);
+                    return Math.round(total / calculations.value.length) + ' м²';
+                });
+
+                const priceRange = computed(() => {
+                    if (calculations.value.length === 0) return '0%';
+                    const prices = calculations.value.map(calc => calc.price);
+                    const min = Math.min(...prices);
+                    const max = Math.max(...prices);
+                    const range = ((max - min) / min) * 100;
+                    return Math.round(range) + '%';
+                });
+
+                return {
+                    calculations,
+                    totalCalculations,
+                    averagePrice,
+                    averageArea,
+                    priceRange
+                };
+            }
+        };
+
+        // About component
+        const About = {
+            template: `
+                <div class="space-y-6">
+                    <div class="bg-white rounded-lg shadow-lg p-8">
+                        <h1 class="text-3xl font-bold text-gray-900 mb-6">О калькуляторе</h1>
+                        
+                        <div class="prose max-w-none">
+                            <p class="text-lg text-gray-700 mb-6">
+                                Наш калькулятор стоимости квартир использует современные алгоритмы оценки недвижимости, 
+                                основанные на актуальных рыночных данных Москвы и области.
+                            </p>
+
+                            <h2 class="text-2xl font-semibold text-gray-900 mb-4">Факторы оценки</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                <div class="bg-blue-50 rounded-lg p-4">
+                                    <h3 class="font-semibold text-blue-900 mb-2">Характеристики квартиры</h3>
+                                    <ul class="text-sm text-blue-800 space-y-1">
+                                        <li>• Общая и жилая площадь</li>
+                                        <li>• Количество комнат</li>
+                                        <li>• Этаж и этажность дома</li>
+                                        <li>• Площадь кухни</li>
+                                        <li>• Высота потолков</li>
+                                    </ul>
+                                </div>
+                                
+                                <div class="bg-green-50 rounded-lg p-4">
+                                    <h3 class="font-semibold text-green-900 mb-2">Характеристики дома</h3>
+                                    <ul class="text-sm text-green-800 space-y-1">
+                                        <li>• Тип постройки</li>
+                                        <li>• Год постройки</li>
+                                        <li>• Наличие лифтов</li>
+                                        <li>• Мусоропровод</li>
+                                        <li>• Парковка</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <h2 class="text-2xl font-semibold text-gray-900 mb-4">Функции приложения</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="text-center p-4 border rounded-lg">
+                                    <div class="text-2xl mb-2">🏠</div>
+                                    <h3 class="font-semibold mb-2">Расчет стоимости</h3>
+                                    <p class="text-sm text-gray-600">Точная оценка с учетом всех параметров</p>
+                                </div>
+                                
+                                <div class="text-center p-4 border rounded-lg">
+                                    <div class="text-2xl mb-2">📊</div>
+                                    <h3 class="font-semibold mb-2">Аналитика</h3>
+                                    <p class="text-sm text-gray-600">Графики и статистика ваших расчетов</p>
+                                </div>
+                                
+                                <div class="text-center p-4 border rounded-lg">
+                                    <div class="text-2xl mb-2">📄</div>
+                                    <h3 class="font-semibold mb-2">Экспорт отчетов</h3>
+                                    <p class="text-sm text-gray-600">PDF и Excel отчеты для печати</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        // Routes
+        const routes = [
+            { path: '/', component: Calculator },
+            { path: '/history', component: History },
+            { path: '/analytics', component: Analytics },
+            { path: '/about', component: About }
+        ];
+
+        // Router
+        const router = createRouter({
+            history: createWebHashHistory(),
+            routes
+        });
+
+        // Include apartment form and calculation history components from the original demo
+        const apartmentFormScript = document.createElement('script');
+        apartmentFormScript.src = '/demo.html';
+        
+        // App with shared state management
+        const app = createApp({
+            setup() {
+                const calculations = ref([]);
+                
+                // Load calculations from localStorage
+                onMounted(() => {
+                    const stored = localStorage.getItem('apartmentCalculations');
+                    if (stored) {
+                        try {
+                            calculations.value = JSON.parse(stored);
+                        } catch (error) {
+                            console.error('Error loading calculations:', error);
+                        }
+                    }
+                });
+                
+                // Provide calculations to all components
+                provide('calculations', calculations);
+                
+                return { calculations };
+            }
+        });
+        
+        app.use(router);
+        app.mount('#app');
+    </script>
+</body>
+</html>
