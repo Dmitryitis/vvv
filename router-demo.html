@@ -293,10 +293,13 @@
                                 </div>
 
                                 <!-- Calculate Button -->
-                                <div class="pt-4">
+                                <div class="pt-4 space-y-3">
                                     <button type="submit" 
                                             :disabled="!canCalculate || isCalculating"
-                                            class="w-full bg-blue-600 text-white font-semibold py-4 px-6 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200 text-lg">
+                                            :class="canCalculate && !isCalculating ? 
+                                                'bg-black hover:bg-gray-800' : 
+                                                'bg-gray-400 cursor-not-allowed'"
+                                            class="w-full text-white font-semibold py-4 px-6 rounded-lg transition-colors duration-200 text-lg">
                                         <span v-if="isCalculating" class="flex items-center justify-center">
                                             <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -305,6 +308,13 @@
                                             Расчет стоимости...
                                         </span>
                                         <span v-else>Рассчитать стоимость</span>
+                                    </button>
+                                    
+                                    <!-- Clear Form Button -->
+                                    <button type="button" 
+                                            @click="clearFormAndSelection"
+                                            class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-6 rounded-lg transition-colors duration-200">
+                                        Очистить форму
                                     </button>
                                 </div>
 
@@ -355,7 +365,12 @@
                             
                             <div v-else class="space-y-3 max-h-96 overflow-y-auto">
                                 <div v-for="(calc, index) in calculations.slice(0, 10)" :key="calc.id" 
-                                     class="group bg-gray-50 hover:bg-blue-50 rounded-2xl p-4 transition-all duration-200 border border-transparent hover:border-blue-100 relative">
+                                     :class="[
+                                         'group rounded-2xl p-4 transition-all duration-200 border relative',
+                                         lastResult && lastResult.id === calc.id 
+                                             ? 'bg-blue-100 border-blue-300 shadow-md' 
+                                             : 'bg-gray-50 hover:bg-blue-50 border-transparent hover:border-blue-100'
+                                     ]">
                                     
                                     <!-- Delete button -->
                                     <button @click.stop="deleteCalculation(calc.id)"
@@ -371,12 +386,26 @@
                                         <!-- Header with number and price -->
                                         <div class="flex items-center justify-between mb-3 pr-8">
                                             <div class="flex items-center gap-3">
-                                                <div class="w-8 h-8 bg-green-100 text-green-700 rounded-lg flex items-center justify-center text-sm font-semibold">
+                                                <div :class="[
+                                                    'w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold relative',
+                                                    lastResult && lastResult.id === calc.id 
+                                                        ? 'bg-blue-600 text-white' 
+                                                        : 'bg-green-100 text-green-700'
+                                                ]">
                                                     {{ index + 1 }}
+                                                    <!-- Selected indicator -->
+                                                    <div v-if="lastResult && lastResult.id === calc.id" 
+                                                         class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white">
+                                                    </div>
                                                 </div>
                                                 <div class="text-lg font-bold text-gray-900">{{ formatPrice(calc.price) }}</div>
                                             </div>
-                                            <div class="text-xs text-gray-500 bg-white px-2 py-1 rounded-lg group-hover:bg-blue-50">
+                                            <div :class="[
+                                                'text-xs px-2 py-1 rounded-lg',
+                                                lastResult && lastResult.id === calc.id 
+                                                    ? 'text-blue-700 bg-blue-200' 
+                                                    : 'text-gray-500 bg-white group-hover:bg-blue-50'
+                                            ]">
                                                 ±15%
                                             </div>
                                         </div>
@@ -698,11 +727,14 @@
 
                 const deleteCalculation = (calcId) => {
                     if (confirm('Удалить этот расчет?')) {
+                        const wasSelected = lastCalculation.value && lastCalculation.value.id === calcId;
+                        
                         calculations.value = calculations.value.filter(calc => calc.id !== calcId);
                         
-                        // If deleted calculation was the last result, clear it
-                        if (lastCalculation.value && lastCalculation.value.id === calcId) {
+                        // If deleted calculation was the last result, clear it and form
+                        if (wasSelected) {
                             lastCalculation.value = null;
+                            clearForm();
                         }
                         
                         // Save updated calculations to localStorage
@@ -710,12 +742,42 @@
                     }
                 };
 
+                const clearFormAndSelection = () => {
+                    clearForm();
+                    lastCalculation.value = null;
+                };
+
                 const clearHistory = () => {
                     if (confirm('Удалить всю историю расчетов? Это действие нельзя отменить.')) {
                         calculations.value = [];
                         lastCalculation.value = null;
                         localStorage.removeItem('apartmentCalculations');
+                        clearForm();
                     }
+                };
+
+                const clearForm = () => {
+                    apartmentData.value = {
+                        totalArea: null,
+                        livingArea: null,
+                        floor: null,
+                        kitchenArea: null,
+                        totalFloors: null,
+                        passengerElevators: null,
+                        cargoElevators: null,
+                        yearBuilt: null,
+                        balcony: false,
+                        garbageChute: false,
+                        parking: false,
+                        rooms: null,
+                        buildingType: null,
+                        ceilingHeight: null,
+                        separateBathrooms: null,
+                        renovation: null,
+                        windowView: null,
+                        metroDistance: null,
+                        objectType: null
+                    };
                 };
 
                 const formatPrice = (price) => {
@@ -745,6 +807,7 @@
                     loadCalculation,
                     deleteCalculation,
                     clearHistory,
+                    clearFormAndSelection,
                     formatPrice,
                     formatDate
                 };
