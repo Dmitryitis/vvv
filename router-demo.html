@@ -26,12 +26,6 @@
                         <router-link to="/" class="nav-link" active-class="nav-link-active">
                             Калькулятор
                         </router-link>
-                        <router-link to="/history" class="nav-link" active-class="nav-link-active">
-                            История
-                        </router-link>
-                        <router-link to="/analytics" class="nav-link" active-class="nav-link-active">
-                            Аналитика
-                        </router-link>
                         <router-link to="/about" class="nav-link" active-class="nav-link-active">
                             О проекте
                         </router-link>
@@ -59,66 +53,211 @@
     </style>
 
     <script>
-        const { createApp, ref, computed, onMounted, nextTick } = Vue;
+        const { createApp, ref, computed, onMounted, nextTick, provide, inject } = Vue;
         const { createRouter, createWebHashHistory } = VueRouter;
 
-        // Calculator component
+        // Calculator component with integrated history
         const Calculator = {
             template: `
-                <div class="space-y-8">
-                    <!-- Hero Section -->
-                    <div class="relative bg-gradient-to-r from-amber-100 to-orange-100 rounded-2xl overflow-hidden">
-                        <div class="flex flex-col lg:flex-row items-center">
-                            <div class="lg:w-1/2 p-8">
-                                <h1 class="text-4xl font-bold text-gray-900 mb-4">Узнайте рыночную стоимость квартиры</h1>
-                                <p class="text-gray-700 text-lg mb-6">Профессиональная оценка недвижимости на основе актуальных рыночных данных</p>
-                                <div class="flex items-center space-x-4 text-sm text-gray-600">
-                                    <div class="flex items-center">
-                                        <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                                        Точная оценка
+                <div class="flex gap-8">
+                    <!-- Main Calculator Section -->
+                    <div class="flex-1 space-y-8">
+                        <!-- Hero Section -->
+                        <div class="relative bg-gradient-to-r from-amber-100 to-orange-100 rounded-2xl overflow-hidden">
+                            <div class="flex flex-col lg:flex-row items-center">
+                                <div class="lg:w-1/2 p-8">
+                                    <h1 class="text-4xl font-bold text-gray-900 mb-4">Узнайте рыночную стоимость квартиры</h1>
+                                    <p class="text-gray-700 text-lg mb-6">Профессиональная оценка недвижимости на основе актуальных рыночных данных</p>
+                                    <div class="flex items-center space-x-4 text-sm text-gray-600">
+                                        <div class="flex items-center">
+                                            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                            Точная оценка
+                                        </div>
+                                        <div class="flex items-center">
+                                            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                            Быстрый расчет
+                                        </div>
                                     </div>
-                                    <div class="flex items-center">
-                                        <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                                        Быстрый расчет
+                                </div>
+                                <div class="lg:w-1/2">
+                                    <img src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80" 
+                                         alt="Современная квартира" 
+                                         class="w-full h-64 lg:h-80 object-cover">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Calculation Result -->
+                        <div v-if="lastResult" class="bg-white rounded-lg shadow-lg p-6">
+                            <h2 class="text-2xl font-semibold mb-4">Результат оценки</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div class="text-center p-4 bg-blue-50 rounded-lg">
+                                    <p class="text-sm text-gray-600 mb-1">Рыночная стоимость</p>
+                                    <p class="text-2xl font-bold text-blue-600">{{ formatPrice(lastResult.price) }}</p>
+                                </div>
+                                <div class="text-center p-4 bg-green-50 rounded-lg">
+                                    <p class="text-sm text-gray-600 mb-1">Минимальная цена</p>
+                                    <p class="text-xl font-semibold text-green-600">{{ formatPrice(lastResult.priceRange?.min) }}</p>
+                                </div>
+                                <div class="text-center p-4 bg-orange-50 rounded-lg">
+                                    <p class="text-sm text-gray-600 mb-1">Максимальная цена</p>
+                                    <p class="text-xl font-semibold text-orange-600">{{ formatPrice(lastResult.priceRange?.max) }}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Calculator Form -->
+                        <div class="bg-white rounded-lg shadow-lg p-6">
+                            <h2 class="text-2xl font-semibold mb-6">Параметры квартиры</h2>
+                            <div class="space-y-6">
+                                <!-- Basic Info -->
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Общая площадь (м²)</label>
+                                        <input v-model.number="formData.totalArea" type="number" class="w-full p-3 border border-gray-300 rounded-lg">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Жилая площадь (м²)</label>
+                                        <input v-model.number="formData.livingArea" type="number" class="w-full p-3 border border-gray-300 rounded-lg">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Этаж</label>
+                                        <input v-model.number="formData.floor" type="number" class="w-full p-3 border border-gray-300 rounded-lg">
+                                    </div>
+                                </div>
+
+                                <!-- Additional Parameters -->
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Количество комнат</label>
+                                        <input v-model.number="formData.rooms" type="number" class="w-full p-3 border border-gray-300 rounded-lg">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Площадь кухни (м²)</label>
+                                        <input v-model.number="formData.kitchenArea" type="number" class="w-full p-3 border border-gray-300 rounded-lg">
+                                    </div>
+                                </div>
+
+                                <!-- Building Type -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Тип дома</label>
+                                    <div class="flex flex-wrap gap-2">
+                                        <button v-for="(type, index) in buildingTypes" :key="index"
+                                                @click="formData.buildingType = index + 1"
+                                                :class="formData.buildingType === index + 1 ? 'bg-black text-white' : 'bg-white text-black border'"
+                                                class="px-4 py-2 rounded-lg border transition-colors">
+                                            {{ type }}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Calculate Button -->
+                                <button @click="calculatePrice" 
+                                        :disabled="!canCalculate"
+                                        class="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors">
+                                    {{ isCalculating ? 'Расчет...' : 'Рассчитать стоимость' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- History Sidebar -->
+                    <div class="w-80">
+                        <div class="bg-white rounded-lg shadow-lg p-6 sticky top-4">
+                            <h3 class="text-xl font-semibold mb-4">История расчетов</h3>
+                            <div v-if="calculations.length === 0" class="text-center py-8 text-gray-500">
+                                <p>Пока нет расчетов</p>
+                            </div>
+                            <div v-else class="space-y-4 max-h-96 overflow-y-auto">
+                                <div v-for="calc in calculations.slice(0, 5)" :key="calc.id" 
+                                     class="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
+                                     @click="loadCalculation(calc)">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <span class="text-lg font-semibold text-blue-600">{{ formatPrice(calc.price) }}</span>
+                                        <span class="text-xs text-gray-500">{{ formatDate(calc.timestamp) }}</span>
+                                    </div>
+                                    <div class="text-sm text-gray-600">
+                                        {{ calc.apartmentData.totalArea }}м² • {{ calc.apartmentData.rooms || 'N' }} комн
                                     </div>
                                 </div>
                             </div>
-                            <div class="lg:w-1/2">
-                                <img src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80" 
-                                     alt="Современная квартира" 
-                                     class="w-full h-64 lg:h-80 object-cover">
-                            </div>
                         </div>
                     </div>
-
-                    <!-- Calculation Result -->
-                    <div v-if="lastResult" class="bg-white rounded-lg shadow-lg p-6">
-                        <h2 class="text-2xl font-semibold mb-4">Результат оценки</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div class="text-center p-4 bg-blue-50 rounded-lg">
-                                <p class="text-sm text-gray-600 mb-1">Рыночная стоимость</p>
-                                <p class="text-2xl font-bold text-blue-600">{{ formatPrice(lastResult.price) }}</p>
-                            </div>
-                            <div class="text-center p-4 bg-green-50 rounded-lg">
-                                <p class="text-sm text-gray-600 mb-1">Минимальная цена</p>
-                                <p class="text-xl font-semibold text-green-600">{{ formatPrice(lastResult.priceRange?.min) }}</p>
-                            </div>
-                            <div class="text-center p-4 bg-orange-50 rounded-lg">
-                                <p class="text-sm text-gray-600 mb-1">Максимальная цена</p>
-                                <p class="text-xl font-semibold text-orange-600">{{ formatPrice(lastResult.priceRange?.max) }}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Apartment Form -->
-                    <apartment-form @calculation-complete="handleCalculation"></apartment-form>
                 </div>
             `,
             setup() {
                 const lastResult = ref(null);
+                const isCalculating = ref(false);
+                const calculations = ref([]);
+                const buildingTypes = ['Панельный', 'Кирпичный', 'Монолитно-кирпичный', 'Монолитный', 'Сталинский'];
+                
+                const formData = ref({
+                    totalArea: null,
+                    livingArea: null,
+                    floor: null,
+                    rooms: null,
+                    kitchenArea: null,
+                    buildingType: null
+                });
 
-                const handleCalculation = (result) => {
+                const canCalculate = computed(() => {
+                    return formData.value.totalArea && formData.value.livingArea && formData.value.floor;
+                });
+
+                onMounted(() => {
+                    const stored = localStorage.getItem('apartmentCalculations');
+                    if (stored) {
+                        calculations.value = JSON.parse(stored);
+                    }
+                });
+
+                const calculatePrice = async () => {
+                    if (!canCalculate.value) return;
+                    
+                    isCalculating.value = true;
+                    
+                    // Simulate API call delay
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    const price = calculateApartmentPrice(formData.value);
+                    const result = {
+                        id: Date.now().toString(),
+                        timestamp: new Date(),
+                        apartmentData: { ...formData.value },
+                        price: price.price,
+                        priceRange: price.priceRange
+                    };
+                    
                     lastResult.value = result;
+                    calculations.value.unshift(result);
+                    localStorage.setItem('apartmentCalculations', JSON.stringify(calculations.value));
+                    
+                    isCalculating.value = false;
+                };
+
+                const calculateApartmentPrice = (data) => {
+                    let basePricePerSqm = 220000;
+                    
+                    if (data.buildingType) {
+                        const multipliers = [0.82, 1.08, 1.18, 1.25, 1.35];
+                        basePricePerSqm *= multipliers[data.buildingType - 1] || 1;
+                    }
+                    
+                    const basePrice = basePricePerSqm * data.totalArea;
+                    const finalPrice = Math.round(basePrice * (1 + (Math.random() - 0.5) * 0.1));
+                    
+                    return {
+                        price: finalPrice,
+                        priceRange: {
+                            min: Math.round(finalPrice * 0.88),
+                            max: Math.round(finalPrice * 1.12)
+                        }
+                    };
+                };
+
+                const loadCalculation = (calc) => {
+                    Object.assign(formData.value, calc.apartmentData);
+                    lastResult.value = calc;
                 };
 
                 const formatPrice = (price) => {
@@ -130,117 +269,26 @@
                     }).format(price);
                 };
 
-                return { lastResult, handleCalculation, formatPrice };
-            }
-        };
-
-        // History component
-        const History = {
-            template: `
-                <div class="space-y-6">
-                    <div class="bg-white rounded-lg shadow-lg p-6">
-                        <h1 class="text-3xl font-bold text-gray-900 mb-6">История расчетов</h1>
-                        <calculation-history></calculation-history>
-                    </div>
-                </div>
-            `
-        };
-
-        // Analytics component
-        const Analytics = {
-            template: `
-                <div class="space-y-6">
-                    <div class="bg-white rounded-lg shadow-lg p-6">
-                        <h1 class="text-3xl font-bold text-gray-900 mb-6">Аналитика рынка</h1>
-                        
-                        <!-- Market Overview Stats -->
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                            <div class="bg-blue-50 rounded-lg p-4 text-center">
-                                <div class="text-2xl font-bold text-blue-600">{{ averagePrice }}</div>
-                                <div class="text-sm text-gray-600">Средняя цена за м²</div>
-                            </div>
-                            <div class="bg-green-50 rounded-lg p-4 text-center">
-                                <div class="text-2xl font-bold text-green-600">{{ totalCalculations }}</div>
-                                <div class="text-sm text-gray-600">Всего расчетов</div>
-                            </div>
-                            <div class="bg-purple-50 rounded-lg p-4 text-center">
-                                <div class="text-2xl font-bold text-purple-600">{{ averageArea }}</div>
-                                <div class="text-sm text-gray-600">Средняя площадь</div>
-                            </div>
-                            <div class="bg-orange-50 rounded-lg p-4 text-center">
-                                <div class="text-2xl font-bold text-orange-600">{{ priceRange }}</div>
-                                <div class="text-sm text-gray-600">Разброс цен</div>
-                            </div>
-                        </div>
-
-                        <!-- Charts Section -->
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" v-if="calculations.length >= 3">
-                            <div class="bg-gray-50 rounded-lg p-4">
-                                <h3 class="text-lg font-medium mb-4">Динамика цен</h3>
-                                <canvas id="priceChart" width="400" height="200"></canvas>
-                            </div>
-                            
-                            <div class="bg-gray-50 rounded-lg p-4">
-                                <h3 class="text-lg font-medium mb-4">Распределение по типам домов</h3>
-                                <canvas id="buildingTypeChart" width="400" height="200"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- No data message -->
-                        <div v-else class="text-center py-12 text-gray-500">
-                            <p class="text-lg">Недостаточно данных для аналитики</p>
-                            <p class="text-sm">Выполните несколько расчетов для просмотра статистики</p>
-                        </div>
-                    </div>
-                </div>
-            `,
-            setup() {
-                const calculations = computed(() => {
-                    const stored = localStorage.getItem('apartmentCalculations');
-                    return stored ? JSON.parse(stored) : [];
-                });
-
-                const totalCalculations = computed(() => calculations.value.length);
-
-                const averagePrice = computed(() => {
-                    if (calculations.value.length === 0) return '0 ₽';
-                    const total = calculations.value.reduce((sum, calc) => {
-                        return sum + (calc.price / calc.apartmentData.totalArea);
-                    }, 0);
-                    const avg = total / calculations.value.length;
-                    return new Intl.NumberFormat('ru-RU', {
-                        style: 'currency',
-                        currency: 'RUB',
-                        minimumFractionDigits: 0
-                    }).format(avg);
-                });
-
-                const averageArea = computed(() => {
-                    if (calculations.value.length === 0) return '0 м²';
-                    const total = calculations.value.reduce((sum, calc) => {
-                        return sum + calc.apartmentData.totalArea;
-                    }, 0);
-                    return Math.round(total / calculations.value.length) + ' м²';
-                });
-
-                const priceRange = computed(() => {
-                    if (calculations.value.length === 0) return '0%';
-                    const prices = calculations.value.map(calc => calc.price);
-                    const min = Math.min(...prices);
-                    const max = Math.max(...prices);
-                    const range = ((max - min) / min) * 100;
-                    return Math.round(range) + '%';
-                });
+                const formatDate = (date) => {
+                    return new Date(date).toLocaleDateString('ru-RU');
+                };
 
                 return {
+                    lastResult,
+                    isCalculating,
                     calculations,
-                    totalCalculations,
-                    averagePrice,
-                    averageArea,
-                    priceRange
+                    buildingTypes,
+                    formData,
+                    canCalculate,
+                    calculatePrice,
+                    loadCalculation,
+                    formatPrice,
+                    formatDate
                 };
             }
         };
+
+
 
         // About component
         const About = {
@@ -309,8 +357,6 @@
         // Routes
         const routes = [
             { path: '/', component: Calculator },
-            { path: '/history', component: History },
-            { path: '/analytics', component: Analytics },
             { path: '/about', component: About }
         ];
 
@@ -320,34 +366,8 @@
             routes
         });
 
-        // Include apartment form and calculation history components from the original demo
-        const apartmentFormScript = document.createElement('script');
-        apartmentFormScript.src = '/demo.html';
-        
-        // App with shared state management
-        const app = createApp({
-            setup() {
-                const calculations = ref([]);
-                
-                // Load calculations from localStorage
-                onMounted(() => {
-                    const stored = localStorage.getItem('apartmentCalculations');
-                    if (stored) {
-                        try {
-                            calculations.value = JSON.parse(stored);
-                        } catch (error) {
-                            console.error('Error loading calculations:', error);
-                        }
-                    }
-                });
-                
-                // Provide calculations to all components
-                provide('calculations', calculations);
-                
-                return { calculations };
-            }
-        });
-        
+        // Create simple app with router
+        const app = createApp({});
         app.use(router);
         app.mount('#app');
     </script>
