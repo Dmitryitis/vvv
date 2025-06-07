@@ -3,7 +3,7 @@
     <div class="container mx-auto px-4 py-8">
       <!-- Hero Section -->
       <div class="w-full bg-gradient-to-r from-amber-100 to-orange-100 rounded-2xl overflow-hidden mb-8">
-        <div class="flex flex-col lg:flex-row items-center">
+        <div class="flex flex-row lg:flex-row items-center">
           <div class="lg:w-1/2 p-8">
             <h1 class="text-4xl font-bold text-gray-900 mb-4">Узнайте рыночную стоимость квартиры</h1>
             <p class="text-gray-700 text-lg mb-6">Профессиональная оценка недвижимости на основе актуальных рыночных данных</p>
