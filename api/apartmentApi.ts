@@ -1,10 +1,72 @@
 import type { ApartmentData, CalculationResponse } from '../types/apartment'
 
+// Real Estate API base URL from environment variable
+const API_BASE_URL = 'http://127.0.0.1:8080'
+
 export const calculateApartmentPrice = async (data: ApartmentData): Promise<CalculationResponse> => {
-  // Simulate API delay for better UX
-  await new Promise(resolve => setTimeout(resolve, 800))
+  try {
+    // Transform our data format to match the API's PropertyRequest schema
+    const apiRequest = transformToApiFormat(data)
+    
+    const response = await fetch(`${API_BASE_URL}/predict`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(apiRequest)
+    })
+    
+    if (!response.ok) {
+      throw new Error(`API error! status: ${response.status}`)
+    }
+    
+    const apiResponse = await response.json()
+    return transformFromApiFormat(apiResponse)
+  } catch (error) {
+    console.error('Real Estate API call failed, falling back to local calculation:', error)
+    // Fallback to local calculation if API fails
+    return calculatePrice(data)
+  }
+}
+
+// Transform our ApartmentData to API's PropertyRequest format
+const transformToApiFormat = (data: ApartmentData) => {
+  return {
+    sale_type: 1, // Default to sale type 1
+    object_type: data.objectType || 1, // Default to 1 if not specified
+    total_area: data.totalArea!,
+    living_area: data.livingArea!,
+    kitchen_area: data.kitchenArea || 0,
+    floor: data.floor!,
+    max_floor: data.totalFloors || null,
+    passenger_elevators: data.passengerElevators || 0,
+    freight_elevators: data.cargoElevators || 0,
+    year_built: data.yearBuilt || 2025,
+    balcony: data.balcony || 0,
+    garbage_chute: data.garbageChute || 0,
+    parking: data.parking || 0,
+    rooms: data.rooms || 1,
+    house_type: data.buildingType || 1,
+    ceiling_height: data.ceilingHeight || 2.7,
+    separate_bathrooms: data.separateBathrooms || 1,
+    renovation: data.renovation || 1,
+    view: data.windowView || 1,
+    metro_distance: data.metroDistance ? `${data.metroDistance} мин. пешком` : null
+  }
+}
+
+// Transform API's PropertyResponse to our CalculationResponse format
+const transformFromApiFormat = (apiResponse: any): CalculationResponse => {
+  const price = Math.round(apiResponse.predicted_price)
+  const variance = price * 0.1 // 10% variance for price range
   
-  return calculatePrice(data)
+  return {
+    price,
+    priceRange: {
+      min: Math.round(price - variance),
+      max: Math.round(price + variance)
+    }
+  }
 }
 
 // Comprehensive apartment price calculation based on Moscow market data

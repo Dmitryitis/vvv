@@ -75,14 +75,6 @@
               </div>
               <div class="text-lg font-bold text-gray-900">{{ formatPrice(calc.price) }}</div>
             </div>
-            <div :class="[
-              'text-xs px-2 py-1 rounded-lg',
-              lastResult && lastResult.id === calc.id 
-                ? 'text-blue-700 bg-blue-200' 
-                : 'text-gray-500 bg-white group-hover:bg-blue-50'
-            ]">
-              ±15%
-            </div>
           </div>
         
           <!-- Price per square meter -->

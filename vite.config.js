@@ -5,11 +5,9 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     port: 5000,
-    host: '0.0.0.0',
     strictPort: true,
     hmr: {
       port: 5000,
-      host: '0.0.0.0'
     }
   },
   define: {

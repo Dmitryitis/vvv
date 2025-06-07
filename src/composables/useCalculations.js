@@ -1,5 +1,5 @@
 import { ref, computed, onMounted } from 'vue'
-
+import {calculateApartmentPrice as calculateApartmentPriceApi} from '../../api/apartmentApi'
 export function useCalculations() {
   const apartmentData = ref({
     totalArea: null,
@@ -54,6 +54,7 @@ export function useCalculations() {
 
   // Price calculation function
   const calculateApartmentPrice = async (data) => {
+    console.log(data)
     await new Promise(resolve => setTimeout(resolve, 800))
     
     const {
@@ -217,14 +218,16 @@ export function useCalculations() {
     isCalculating.value = true
     
     try {
-      const result = await calculateApartmentPrice(apartmentData.value)
+      const res = await calculateApartmentPriceApi(apartmentData.value)
+      console.log(res)
+      // const result = await calculateApartmentPrice(apartmentData.value)
       
       const calculationResult = {
         id: Date.now().toString(),
         timestamp: new Date(),
         apartmentData: { ...apartmentData.value },
-        price: result.price,
-        priceRange: result.priceRange
+        price: res.price,
+        priceRange: res.priceRange
       }
       
       lastCalculation.value = calculationResult

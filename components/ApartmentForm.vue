@@ -345,7 +345,7 @@ onMounted(() => {
 const submitForm = async () => {
   try {
     loading.value = true
-    
+    console.log(formData)
     const result = await calculateApartmentPrice(formData)
     
     const calculationResult: CalculationResult = {
